@@ -18,7 +18,7 @@ class EpisodeFunctions:
     @staticmethod
     def PlotRewards(episodes: List[Episode]):
         x = [index for index in range(len(episodes))]
-        y = [episode["AverageRewards"][-1] for episode in episodes]
+        y = [sum(episode["AverageRewards"]) for episode in episodes]
         plt.plot(x, y)
         plt.title("Rewards per Episode")
         plt.ylabel("Reward")

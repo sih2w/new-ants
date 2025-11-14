@@ -114,14 +114,14 @@ class EnvConfig:
 
 if __name__ == "__main__":
     params: EnvParams = {
-        "AgentCount": 1,
+        "AgentCount": 2,
         "FoodCount": 5,
         "ObstacleCount": 10,
         "NestCount": 1,
         "GridSize": {"X": 10, "Y": 10},
         "Seed": 1,
         "MaxSteps": 10_000,
-        "EpisodeCount": 100
+        "EpisodeCount": 1000
     }
 
     lookups, episodes = DataStoreFunctions.Load(params)
