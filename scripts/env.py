@@ -29,7 +29,7 @@ AGENT_ACTIONS = (
     }
 )
 
-IMAGE_PIXEL_WIDTH = 40
+IMAGE_PIXEL_WIDTH = 48
 ARROW_IMAGE = "../images/icons8-triangle-48.png"
 AGENT_IMAGE = "../images/icons8-ant-48.png"
 NEST_IMAGE = "../images/icons8-egg-basket-48.png"
