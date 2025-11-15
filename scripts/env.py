@@ -2,7 +2,6 @@ from math import floor, hypot
 from typing import List, TypedDict, Literal, Callable, TypeVar, Optional, Tuple
 from pygame import Color, Surface
 from pygame.font import Font
-from pygame.time import Clock
 from numpy.random import Generator, PCG64
 from vector import Vector2
 from scripts.event import Event, EventFunctions
@@ -88,7 +87,6 @@ class Env(TypedDict):
     GridSize: Vector2
     Window: Optional[Surface]
     WindowSize: Vector2
-    Clock: Optional[Clock]
     Font: Optional[Font]
     Running: bool
     CurrentStep: int
@@ -236,7 +234,6 @@ class EnvFunctions:
             env["Initialized"] = True
             env["Window"] = pygame.display.set_mode((env["WindowSize"]["X"], env["WindowSize"]["Y"]))
             env["Font"] = pygame.font.SysFont("arialblack", 30)
-            env["Clock"] = Clock()
 
             for agent in env["Agents"]:
                 agent["SpawnLocation"] = EnvFunctions.GetEmptyLocation(env)
@@ -560,18 +557,19 @@ class EnvFunctions:
         EnvFunctions.RenderFrame(env)
 
         while env["Running"] and pygame.get_init():
-            event = pygame.event.wait(0)
-            if EnvFunctions.AllDeposited(env):
-                EnvFunctions.Reset(env)
+            if pygame.key.get_pressed()[pygame.K_SPACE]:
+                if EnvFunctions.AllDeposited(env):
+                    EnvFunctions.Reset(env)
 
-            if event.type == pygame.KEYDOWN:
-                if pygame.key.get_pressed()[pygame.K_SPACE]:
-                    EnvFunctions.Step(env)
-                    EnvFunctions.RenderFrame(env)
+                EnvFunctions.Step(env)
+                EnvFunctions.RenderFrame(env)
 
-            if event.type == pygame.QUIT:
-                env["Running"] = False
-                EnvFunctions.Close()
+                pygame.time.delay(100)
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    env["Running"] = False
+                    EnvFunctions.Close()
 
     @staticmethod
     def HasQuit():

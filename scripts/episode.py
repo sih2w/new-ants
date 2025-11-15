@@ -24,3 +24,13 @@ class EpisodeFunctions:
         plt.ylabel("Reward")
         plt.xlabel(f"Episode")
         plt.show()
+
+    @staticmethod
+    def PlotSteps(episodes: List[Episode]):
+        x = [index for index in range(len(episodes))]
+        y = [len(episode["AverageRewards"]) for episode in episodes]
+        plt.plot(x, y)
+        plt.title("Steps per Episode")
+        plt.ylabel("Steps")
+        plt.xlabel(f"Episode")
+        plt.show()

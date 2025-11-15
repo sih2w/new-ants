@@ -124,14 +124,14 @@ class EnvConfig:
 
 if __name__ == "__main__":
     params: EnvParams = {
-        "AgentCount": 2,
-        "FoodCount": 5,
+        "AgentCount": 1,
+        "FoodCount": 30,
         "ObstacleCount": 10,
         "NestCount": 1,
-        "GridSize": {"X": 15, "Y": 10},
+        "GridSize": {"X": 10, "Y": 10},
         "Seed": 1,
-        "MaxSteps": 10_000,
-        "EpisodeCount": 1000,
+        "MaxSteps": 10_000_000,
+        "EpisodeCount": 10_000,
         "ProximityRadius": 1.00,
     }
 
@@ -155,6 +155,7 @@ if __name__ == "__main__":
 
     # Plot the training results.
     EpisodeFunctions.PlotRewards(episodes)
+    EpisodeFunctions.PlotSteps(episodes)
 
     # Draw decision arrows on render.
     EventFunctions.Connect(env["Rendered"], EnvConfig.OnRendered)

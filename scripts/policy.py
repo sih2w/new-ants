@@ -1,7 +1,7 @@
 from typing import TypedDict, List
 import numpy as np
 from numpy.random import Generator
-from scripts.env import Agent, EnvState, AGENT_ACTIONS
+from scripts.env import EnvState, AGENT_ACTIONS
 from vector import Vector2
 
 
