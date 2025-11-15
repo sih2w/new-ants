@@ -1,5 +1,5 @@
 from typing import List, Any
-from scripts.env import EnvFunctions, Env, EnvParams, Agent, EnvState, AGENT_ACTIONS
+from scripts.env import EnvFunctions, Env, EnvParams, Agent, EnvState
 from scripts.datastore import DataStoreFunctions
 from scripts.event import EventFunctions
 from scripts.episode import Episode, EpisodeFunctions
@@ -8,6 +8,7 @@ from scripts.vector import Vector2
 
 
 class EnvConfig:
+    # These variables are shared among the class's static functions.
     Actions: List[int] = []
     Rewards: List[int] = []
     Epsilon: float = 1
@@ -24,6 +25,7 @@ class EnvConfig:
             episode_count: int,
             env: Env
     ):
+        # Initialize custom function fields.
         EnvConfig.Lookups = lookup
         EnvConfig.Episodes = episodes
         EnvConfig.DecayRate = 1 / episode_count
@@ -61,9 +63,11 @@ class EnvConfig:
 
     @staticmethod
     def OnTrainingStepStarted(message: Any):
+        # Clear the last step's actions and rewards.
         EnvConfig.Actions.clear()
         EnvConfig.Rewards.clear()
 
+        # Update each agent using Q-learning.
         for index, agent in enumerate(EnvConfig.Env["Agents"]):
             EnvConfig.Actions.append(EnvConfig.QAction(index, message["State"]))
             EnvConfig.Rewards.append(EnvConfig.UpdateAgent(agent, EnvConfig.Actions[index]))
@@ -72,7 +76,7 @@ class EnvConfig:
     @staticmethod
     def OnTrainingStepEnded(message: Any):
         total_rewards, count = 0, 1
-
+        # Update each agent's policy with the chosen action and resulting rewards.
         for index, agent in enumerate(EnvConfig.Env["Agents"]):
             total_rewards += EnvConfig.Rewards[index]
             PolicyFunctions.UpdatePolicy(
@@ -84,12 +88,13 @@ class EnvConfig:
                 reward=EnvConfig.Rewards[index],
             )
 
+        # Add the average reward to the current episode and reduce epsilon.
         EnvConfig.CurrentEpisode["AverageRewards"].append(total_rewards / count)
         EnvConfig.Epsilon -= EnvConfig.DecayRate
 
     @staticmethod
     def OnTestingStepStarted(message: Any):
-        EnvConfig.Epsilon = 0
+        EnvConfig.Epsilon = 0 # Set to zero to get the most optimal action.
 
         for index, agent in enumerate(EnvConfig.Env["Agents"]):
             agent["LastAction"] = EnvConfig.QAction(index, message["State"])
@@ -108,9 +113,14 @@ class EnvConfig:
 
     @staticmethod
     def OnEpisodeEnded(message: Any):
+        # Add the current episode to the episode list and then create a new episode.
         EnvConfig.Episodes.append(EnvConfig.CurrentEpisode)
         EnvConfig.CurrentEpisode = EpisodeFunctions.Episode()
 
+    @staticmethod
+    def OnProximityDetected(message: Any):
+        # TODO: Exchange logic here.
+        pass
 
 if __name__ == "__main__":
     params: EnvParams = {
@@ -118,36 +128,46 @@ if __name__ == "__main__":
         "FoodCount": 5,
         "ObstacleCount": 10,
         "NestCount": 1,
-        "GridSize": {"X": 10, "Y": 10},
+        "GridSize": {"X": 15, "Y": 10},
         "Seed": 1,
         "MaxSteps": 10_000,
-        "EpisodeCount": 1000
+        "EpisodeCount": 1000,
+        "ProximityRadius": 1.00,
     }
 
     lookups, episodes = DataStoreFunctions.Load(params)
     env: Env = EnvFunctions.Env(params)
 
+    # Config the custom functions.
     EnvConfig(lookups, episodes, params["EpisodeCount"], env)
-    EnvFunctions.PygameInit()
-    EnvFunctions.EnvInit(env)
-    EventFunctions.Connect(env["Rendered"], EnvConfig.OnRendered)
+
+    # Initialize pygame and the env.
+    EnvFunctions.Init(env)
 
     if len(episodes) == 0:
+        # Connect the training events and start training.
         EventFunctions.Connect(env["StepStarted"], EnvConfig.OnTrainingStepStarted)
         EventFunctions.Connect(env["StepEnded"], EnvConfig.OnTrainingStepEnded)
         EventFunctions.Connect(env["EpisodeStarted"], EnvConfig.OnEpisodeStarted)
         EventFunctions.Connect(env["EpisodeEnded"], EnvConfig.OnEpisodeEnded)
-        env["RenderStep"] = False
-        EnvFunctions.RunAutomatic(env)
+        EventFunctions.Connect(env["ProximityDetected"], EnvConfig.OnProximityDetected)
+        EnvFunctions.RunTrain(env)
 
+    # Plot the training results.
     EpisodeFunctions.PlotRewards(episodes)
 
-    env["RenderStep"] = True
+    # Draw decision arrows on render.
+    EventFunctions.Connect(env["Rendered"], EnvConfig.OnRendered)
+
+    # Disconnect the training events.
     EventFunctions.DisconnectAll(env["StepStarted"])
     EventFunctions.DisconnectAll(env["StepEnded"])
     EventFunctions.DisconnectAll(env["EpisodeStarted"])
     EventFunctions.DisconnectAll(env["EpisodeEnded"])
-    EventFunctions.Connect(env["StepStarted"], EnvConfig.OnTestingStepStarted)
-    EnvFunctions.RunManual(env)
 
+    # Connect the testing events and view result of training.
+    EventFunctions.Connect(env["StepStarted"], EnvConfig.OnTestingStepStarted)
+    EnvFunctions.RunTest(env)
+
+    # Save the training results.
     DataStoreFunctions.Save(params, lookups, episodes)

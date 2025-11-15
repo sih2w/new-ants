@@ -1,3 +1,4 @@
+from math import floor, hypot
 from typing import List, TypedDict, Literal, Callable, TypeVar, Optional, Tuple
 from pygame import Color, Surface
 from pygame.font import Font
@@ -79,6 +80,7 @@ class Env(TypedDict):
     Rendered: Event
     EpisodeStarted: Event
     EpisodeEnded: Event
+    ProximityDetected: Event
     Food: List[Food]
     Obstacles: List[Obstacle]
     Nests: List[Nest]
@@ -89,10 +91,10 @@ class Env(TypedDict):
     Clock: Optional[Clock]
     Font: Optional[Font]
     Running: bool
-    RenderStep: bool
     CurrentStep: int
     MaxSteps: int
     EpisodeCount: int
+    ProximityRadius: float
 
 
 class EnvParams(TypedDict):
@@ -104,6 +106,7 @@ class EnvParams(TypedDict):
     Seed: int
     MaxSteps: int
     EpisodeCount: int
+    ProximityRadius: float
 
 
 class EnvFunctions:
@@ -166,14 +169,15 @@ class EnvFunctions:
             "AllFoodDeposited": EventFunctions.Event(),
             "MaxStepReached": EventFunctions.Event(),
             "Rendered": EventFunctions.Event(),
+            "ProximityDetected": EventFunctions.Event(),
             "EpisodeStarted": EventFunctions.Event(),
             "EpisodeEnded": EventFunctions.Event(),
             "GridSize": params["GridSize"],
             "Running": False,
-            "RenderStep": True,
             "CurrentStep": 0,
             "MaxSteps": params["MaxSteps"],
             "EpisodeCount": params["EpisodeCount"],
+            "ProximityRadius": params["ProximityRadius"],
             "WindowSize": {
                 "X": IMAGE_PIXEL_WIDTH * params["GridSize"]["X"],
                 "Y": IMAGE_PIXEL_WIDTH * params["GridSize"]["Y"]
@@ -213,7 +217,7 @@ class EnvFunctions:
         return None
 
     @staticmethod
-    def PygameInit():
+    def Init(env: Env):
         if not pygame.get_init():
             pygame.init()
             pygame.display.set_caption("Ants")
@@ -228,8 +232,6 @@ class EnvFunctions:
                 pygame.KEYUP
             ])
 
-    @staticmethod
-    def EnvInit(env: Env):
         if not env["Initialized"]:
             env["Initialized"] = True
             env["Window"] = pygame.display.set_mode((env["WindowSize"]["X"], env["WindowSize"]["Y"]))
@@ -253,7 +255,7 @@ class EnvFunctions:
                 food["Location"] = food["SpawnLocation"]
 
     @staticmethod
-    def EnvReset(env: Env):
+    def Reset(env: Env):
         env["CurrentStep"] = 0
 
         for agent in env["Agents"]:
@@ -270,7 +272,6 @@ class EnvFunctions:
             food["Status"] = "Dropped"
 
         EventFunctions.Fire(env["Reset"], None)
-        return None
 
     @staticmethod
     def OutOfBounds(env: Env, location: Vector2) -> bool:
@@ -413,7 +414,7 @@ class EnvFunctions:
                     surface.blit(image, EnvFunctions.GetDrawPosition(location))
 
     @staticmethod
-    def EnvDraw(env: Env, surface: Surface):
+    def Draw(env: Env, surface: Surface):
         if pygame.get_init():
             EnvFunctions.DrawGrass(env, surface)
             EnvFunctions.DrawObstacles(env, surface)
@@ -466,7 +467,21 @@ class EnvFunctions:
         }
 
     @staticmethod
-    def EnvStep(env: Env):
+    def CheckProximity(env: Env):
+        for agent1 in env["Agents"]:
+            for agent2 in env["Agents"]:
+                dx = agent2["Location"]["X"] - agent1["Location"]["X"]
+                dy = agent2["Location"]["Y"] - agent1["Location"]["Y"]
+                distance = floor(hypot(dx, dy))
+
+                if distance <= env["ProximityRadius"]:
+                    EventFunctions.Fire(env["ProximityDetected"], {
+                        "Agent1": agent1,
+                        "Agent2": agent2,
+                    })
+
+    @staticmethod
+    def Step(env: Env):
         old_state = EnvFunctions.GetState(env)
         EventFunctions.Fire(env["StepStarted"], {
             "State": old_state,
@@ -480,6 +495,8 @@ class EnvFunctions:
         if env["CurrentStep"] >= env["MaxSteps"]:
             EventFunctions.Fire(env["MaxStepReached"], None)
 
+        EnvFunctions.CheckProximity(env)
+
         new_state = EnvFunctions.GetState(env)
         EventFunctions.Fire(env["StepEnded"], {
             "OldState": old_state,
@@ -492,7 +509,7 @@ class EnvFunctions:
     def RenderFrame(env: Env):
         if pygame.get_init():
             surface = pygame.Surface((env["WindowSize"]["X"], env["WindowSize"]["Y"]))
-            EnvFunctions.EnvDraw(env, surface)
+            EnvFunctions.Draw(env, surface)
             EventFunctions.Fire(env["Rendered"], {
                 "Surface": surface,
                 "State": EnvFunctions.GetState(env),
@@ -503,15 +520,15 @@ class EnvFunctions:
             pygame.display.flip()
 
     @staticmethod
-    def RunAutomatic(env: Env):
+    def RunTrain(env: Env):
         env["Running"] = True
-        EnvFunctions.EnvReset(env)
+        EnvFunctions.Reset(env)
         EnvFunctions.RenderFrame(env)
 
         progress_bar = tqdm(total=env["EpisodeCount"])
 
         for episode in range(env["EpisodeCount"]):
-            EnvFunctions.EnvReset(env)
+            EnvFunctions.Reset(env)
             EventFunctions.Fire(env["EpisodeStarted"], {
                 "Episode": episode,
             })
@@ -521,9 +538,7 @@ class EnvFunctions:
                     return
 
                 event = pygame.event.poll()
-                EnvFunctions.EnvStep(env)
-                if env["RenderStep"]:
-                    EnvFunctions.RenderFrame(env)
+                EnvFunctions.Step(env)
 
                 if event.type == pygame.QUIT:
                     env["Running"] = False
@@ -539,21 +554,20 @@ class EnvFunctions:
         return None
 
     @staticmethod
-    def RunManual(env: Env):
+    def RunTest(env: Env):
         env["Running"] = True
-        EnvFunctions.EnvReset(env)
+        EnvFunctions.Reset(env)
         EnvFunctions.RenderFrame(env)
 
         while env["Running"] and pygame.get_init():
             event = pygame.event.wait(0)
             if EnvFunctions.AllDeposited(env):
-                EnvFunctions.EnvReset(env)
+                EnvFunctions.Reset(env)
 
             if event.type == pygame.KEYDOWN:
                 if pygame.key.get_pressed()[pygame.K_SPACE]:
-                    EnvFunctions.EnvStep(env)
-                    if env["RenderStep"]:
-                        EnvFunctions.RenderFrame(env)
+                    EnvFunctions.Step(env)
+                    EnvFunctions.RenderFrame(env)
 
             if event.type == pygame.QUIT:
                 env["Running"] = False

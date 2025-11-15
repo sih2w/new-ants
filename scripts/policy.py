@@ -31,6 +31,10 @@ class PolicyFunctions:
 
     @staticmethod
     def PolicyLookup(size: Vector2, food_count: int) -> PolicyLookup:
+        # If an agent is carrying food it will access HasFood. HasFood is a single grid of policies, where
+        # each square contains QValues. If an agent does not have food, it will then access NoFood. NoFood is a list
+        # of gridded policies, where the number of gridded policies corresponds to the initial number of food. For example,
+        # if there is 5 food total and 3 food remaining, the agent will access the third grid of policies.
         return {
             "HasFood": PolicyFunctions.GridOfPolicies(size),
             "NoFood": [PolicyFunctions.GridOfPolicies(size) for _ in range(food_count + 1)],
