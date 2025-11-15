@@ -57,14 +57,11 @@ class PolicyFunctions:
             action: int,
             reward: float,
     ) -> None:
-        oldPolicy = PolicyFunctions.GetPolicy(lookup, agent_index, old_state)
-        newPolicy = PolicyFunctions.GetPolicy(lookup, agent_index, new_state)
-
-        predict = oldPolicy["QValues"][action]
-        target = reward + DISCOUNT_FACTOR * max(newPolicy["QValues"])
-
-        oldPolicy["QValues"][action] += LEARNING_RATE * (target - predict)
-        return None
+        old_policy = PolicyFunctions.GetPolicy(lookup, agent_index, old_state)
+        new_policy = PolicyFunctions.GetPolicy(lookup, agent_index, new_state)
+        predict = old_policy["QValues"][action]
+        target = reward + DISCOUNT_FACTOR * max(new_policy["QValues"])
+        old_policy["QValues"][action] += LEARNING_RATE * (target - predict)
 
     @staticmethod
     def GetAction(
