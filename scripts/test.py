@@ -8,7 +8,6 @@ from scripts.vector import Vector2
 
 
 class EnvConfig:
-    # These variables are shared among the class's static functions.
     Actions: List[int] = []
     Rewards: List[int] = []
     Epsilon: float = 1
@@ -124,12 +123,12 @@ class EnvConfig:
 
 if __name__ == "__main__":
     params: EnvParams = {
-        "AgentCount": 1,
+        "AgentCount": 2,
         "FoodCount": 30,
-        "ObstacleCount": 10,
+        "ObstacleCount": 50,
         "NestCount": 1,
-        "GridSize": {"X": 10, "Y": 10},
-        "Seed": 1,
+        "GridSize": {"X": 30, "Y": 20},
+        "Seed": 2,
         "MaxSteps": 10_000_000,
         "EpisodeCount": 10_000,
         "ProximityRadius": 1.00,
@@ -151,7 +150,17 @@ if __name__ == "__main__":
         EventFunctions.Connect(env["EpisodeStarted"], EnvConfig.OnEpisodeStarted)
         EventFunctions.Connect(env["EpisodeEnded"], EnvConfig.OnEpisodeEnded)
         EventFunctions.Connect(env["ProximityDetected"], EnvConfig.OnProximityDetected)
+
         EnvFunctions.RunTrain(env)
+
+        # Disconnect the training events.
+        EventFunctions.DisconnectAll(env["StepStarted"])
+        EventFunctions.DisconnectAll(env["StepEnded"])
+        EventFunctions.DisconnectAll(env["EpisodeStarted"])
+        EventFunctions.DisconnectAll(env["EpisodeEnded"])
+
+        # Save the training results.
+        DataStoreFunctions.Save(params, lookups, episodes)
 
     # Plot the training results.
     EpisodeFunctions.PlotRewards(episodes)
@@ -160,15 +169,6 @@ if __name__ == "__main__":
     # Draw decision arrows on render.
     EventFunctions.Connect(env["Rendered"], EnvConfig.OnRendered)
 
-    # Disconnect the training events.
-    EventFunctions.DisconnectAll(env["StepStarted"])
-    EventFunctions.DisconnectAll(env["StepEnded"])
-    EventFunctions.DisconnectAll(env["EpisodeStarted"])
-    EventFunctions.DisconnectAll(env["EpisodeEnded"])
-
     # Connect the testing events and view result of training.
     EventFunctions.Connect(env["StepStarted"], EnvConfig.OnTestingStepStarted)
     EnvFunctions.RunTest(env)
-
-    # Save the training results.
-    DataStoreFunctions.Save(params, lookups, episodes)

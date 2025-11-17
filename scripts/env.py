@@ -530,13 +530,10 @@ class EnvFunctions:
                 "Episode": episode,
             })
 
-            while not EnvFunctions.AllDeposited(env):
-                if not env["Running"] or not pygame.get_init():
-                    return
-
-                event = pygame.event.poll()
+            while not EnvFunctions.AllDeposited(env) and env["Running"] and pygame.get_init():
                 EnvFunctions.Step(env)
 
+                event = pygame.event.poll()
                 if event.type == pygame.QUIT:
                     env["Running"] = False
                     EnvFunctions.Close()
@@ -546,9 +543,8 @@ class EnvFunctions:
             })
 
             progress_bar.update(1)
-        progress_bar.close()
 
-        return None
+        progress_bar.close()
 
     @staticmethod
     def RunTest(env: Env):
@@ -564,20 +560,12 @@ class EnvFunctions:
                 EnvFunctions.Step(env)
                 EnvFunctions.RenderFrame(env)
 
-                pygame.time.delay(100)
+                pygame.time.delay(30)
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     env["Running"] = False
                     EnvFunctions.Close()
-
-    @staticmethod
-    def HasQuit():
-        if pygame.get_init():
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    return True
-        return False
 
     @staticmethod
     def Close():
