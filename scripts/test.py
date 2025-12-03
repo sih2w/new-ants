@@ -17,30 +17,32 @@ class EnvConfig:
     CurrentEpisode: Episode
     Env: Env
 
-    def __init__(
-            self,
-            lookup: List[PolicyLookup],
-            episodes: List[Episode],
-            episode_count: int,
-            env: Env
-    ):
-        # Initialize custom function fields.
-        EnvConfig.Lookups = lookup
-        EnvConfig.Episodes = episodes
-        EnvConfig.DecayRate = 1 / episode_count
-        EnvConfig.Env = env
-        EnvConfig.CurrentEpisode = EpisodeFunctions.Episode()
+    @staticmethod
+    def BeforeDeposited(food_index: int) -> bool:
+        for index, food in enumerate(env["Food"]):
+            if index < food_index and food["Status"] != "Deposited":
+                return False
+        return True
 
     @staticmethod
-    def UpdateAgent(agent: Agent, action: int):
+    def AfterDeposited(food_index: int) -> bool:
+        for index, food in enumerate(env["Food"]):
+            if index > food_index and food["Status"] != "Deposited":
+                return False
+        return True
+
+    @staticmethod
+    def UpdateAgent1(agent: Agent, action: int):
         success = EnvFunctions.TryMoveAgent(EnvConfig.Env, agent, action)
         if not success:
             return -1000
 
         food = EnvFunctions.OnDroppedFood(EnvConfig.Env, agent["Location"])
         if food and EnvFunctions.CanPickup(agent, food):
-            EnvFunctions.GiveFood(agent, food)
-            return 10
+            # Only pickup if all prior food has been deposited.
+            if EnvConfig.BeforeDeposited(EnvConfig.Env["Food"].index(food)):
+                EnvFunctions.GiveFood(agent, food)
+                return 10
 
         nest = EnvFunctions.OnNest(EnvConfig.Env, agent["Location"])
         if nest:
@@ -49,6 +51,33 @@ class EnvConfig:
                     EnvFunctions.Deposit(EnvConfig.Env, agent, food)
                     return 10
         return -1
+
+    @staticmethod
+    def UpdateAgent2(agent: Agent, action: int):
+        success = EnvFunctions.TryMoveAgent(EnvConfig.Env, agent, action)
+        if not success:
+            return -1000
+
+        food = EnvFunctions.OnDroppedFood(EnvConfig.Env, agent["Location"])
+        if food and EnvFunctions.CanPickup(agent, food):
+            # Only pickup if all food after has been deposited.
+            if EnvConfig.AfterDeposited(EnvConfig.Env["Food"].index(food)):
+                EnvFunctions.GiveFood(agent, food)
+                return 10
+
+        nest = EnvFunctions.OnNest(EnvConfig.Env, agent["Location"])
+        if nest:
+            for food in agent["Food"]:
+                if EnvFunctions.CanDeposit(EnvConfig.Env, agent, food):
+                    EnvFunctions.Deposit(EnvConfig.Env, agent, food)
+                    return 10
+        return -1
+
+    @staticmethod
+    def UpdateAgent(agent: Agent, index: int, action: int):
+        if index == 1:
+            return EnvConfig.UpdateAgent1(agent, action)
+        return EnvConfig.UpdateAgent2(agent, action)
 
     @staticmethod
     def QAction(agent_index: int, state: EnvState):
@@ -69,7 +98,7 @@ class EnvConfig:
         # Update each agent using Q-learning.
         for index, agent in enumerate(EnvConfig.Env["Agents"]):
             EnvConfig.Actions.append(EnvConfig.QAction(index, message["State"]))
-            EnvConfig.Rewards.append(EnvConfig.UpdateAgent(agent, EnvConfig.Actions[index]))
+            EnvConfig.Rewards.append(EnvConfig.UpdateAgent(agent, index, EnvConfig.Actions[index]))
             agent["LastAction"] = EnvConfig.Actions[index]
 
     @staticmethod
@@ -97,7 +126,7 @@ class EnvConfig:
 
         for index, agent in enumerate(EnvConfig.Env["Agents"]):
             agent["LastAction"] = EnvConfig.QAction(index, message["State"])
-            EnvConfig.UpdateAgent(agent, agent["LastAction"])
+            EnvConfig.UpdateAgent(agent, index, agent["LastAction"])
 
     @staticmethod
     def OnRendered(message: Any):
@@ -124,12 +153,12 @@ class EnvConfig:
 if __name__ == "__main__":
     params: EnvParams = {
         "AgentCount": 2,
-        "FoodCount": 30,
-        "ObstacleCount": 50,
+        "FoodCount": 10,
+        "ObstacleCount": 10,
         "NestCount": 1,
-        "GridSize": {"X": 30, "Y": 20},
+        "GridSize": {"X": 15, "Y": 15},
         "Seed": 2,
-        "MaxSteps": 10_000_000,
+        "MaxSteps": 10_000,
         "EpisodeCount": 10_000,
         "ProximityRadius": 1.00,
     }
@@ -138,7 +167,11 @@ if __name__ == "__main__":
     env: Env = EnvFunctions.Env(params)
 
     # Config the custom functions.
-    EnvConfig(lookups, episodes, params["EpisodeCount"], env)
+    EnvConfig.Lookups = lookups
+    EnvConfig.Episodes = episodes
+    EnvConfig.DecayRate = 1 / params["EpisodeCount"]
+    EnvConfig.Env = env
+    EnvConfig.CurrentEpisode = EpisodeFunctions.Episode()
 
     # Initialize pygame and the env.
     EnvFunctions.Init(env)
@@ -167,7 +200,7 @@ if __name__ == "__main__":
     EpisodeFunctions.PlotSteps(episodes)
 
     # Draw decision arrows on render.
-    EventFunctions.Connect(env["Rendered"], EnvConfig.OnRendered)
+    # EventFunctions.Connect(env["Rendered"], EnvConfig.OnRendered)
 
     # Connect the testing events and view result of training.
     EventFunctions.Connect(env["StepStarted"], EnvConfig.OnTestingStepStarted)

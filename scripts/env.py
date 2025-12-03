@@ -560,7 +560,7 @@ class EnvFunctions:
                 EnvFunctions.Step(env)
                 EnvFunctions.RenderFrame(env)
 
-                pygame.time.delay(30)
+                pygame.time.delay(100)
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
