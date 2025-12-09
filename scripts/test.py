@@ -222,7 +222,7 @@ if __name__ == "__main__":
         EventFunctions.Connect(env["StepEnded"], EnvTest.OnTrainingStepEnded)
         EventFunctions.Connect(env["EpisodeStarted"], EnvTest.OnEpisodeStarted)
         EventFunctions.Connect(env["EpisodeEnded"], EnvTest.OnEpisodeEnded)
-        # EventFunctions.Connect(env["ProximityDetected"], EnvTest.OnProximityDetected)
+        EventFunctions.Connect(env["ProximityDetected"], EnvTest.OnProximityDetected)
 
         EnvFunctions.RunTrain(env)
 
