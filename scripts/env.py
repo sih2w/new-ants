@@ -1,5 +1,5 @@
 from math import floor, hypot
-from typing import List, TypedDict, Literal, Callable, TypeVar, Optional, Tuple
+from typing import List, TypedDict, Literal, Callable, TypeVar, Optional, Tuple, Dict
 from pygame import Color, Surface
 from pygame.font import Font
 from numpy.random import Generator, PCG64
@@ -465,13 +465,22 @@ class EnvFunctions:
 
     @staticmethod
     def CheckProximity(env: Env):
-        for agent1 in env["Agents"]:
-            for agent2 in env["Agents"]:
+        detected: Dict[int, List[int]] = {}
+        for index, _ in enumerate(env["Agents"]):
+            detected[index] = []
+
+        for index1, agent1 in enumerate(env["Agents"]):
+            for index2, agent2 in enumerate(env["Agents"]):
+                if index2 in detected[index1] or index1 in detected[index2]:
+                    continue
+
                 dx = agent2["Location"]["X"] - agent1["Location"]["X"]
                 dy = agent2["Location"]["Y"] - agent1["Location"]["Y"]
                 distance = floor(hypot(dx, dy))
 
                 if distance <= env["ProximityRadius"]:
+                    detected[index1].append(index2)
+                    detected[index2].append(index1)
                     EventFunctions.Fire(env["ProximityDetected"], {
                         "Agent1": agent1,
                         "Agent2": agent2,

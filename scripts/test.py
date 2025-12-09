@@ -74,10 +74,31 @@ class EnvTest:
         return -1
 
     @staticmethod
+    def UpdateAgent3(agent: Agent, action: int):
+        success = EnvFunctions.TryMoveAgent(EnvTest.Env, agent, action)
+        if not success:
+            return -1000
+
+        food = EnvFunctions.OnDroppedFood(EnvTest.Env, agent["Location"])
+        if food and EnvFunctions.CanPickup(agent, food):
+            EnvFunctions.GiveFood(agent, food)
+            return 10
+
+        nest = EnvFunctions.OnNest(EnvTest.Env, agent["Location"])
+        if nest:
+            for food in agent["Food"]:
+                if EnvFunctions.CanDeposit(EnvTest.Env, agent, food):
+                    EnvFunctions.Deposit(EnvTest.Env, agent, food)
+                    return 10
+        return -1
+
+    @staticmethod
     def UpdateAgent(agent: Agent, index: int, action: int):
-        if index == 1:
-            return EnvTest.UpdateAgent1(agent, action)
-        return EnvTest.UpdateAgent2(agent, action)
+        # if index == 1:
+        #     return EnvTest.UpdateAgent1(agent, action)
+        # elif index == 2:
+        #     return EnvTest.UpdateAgent2(agent, action)
+        return EnvTest.UpdateAgent3(agent, action)
 
     @staticmethod
     def QAction(agent_index: int, state: EnvState):
@@ -147,8 +168,27 @@ class EnvTest:
 
     @staticmethod
     def OnProximityDetected(message: Any):
-        # TODO: Exchange logic here.
-        pass
+        index1 = EnvTest.Env["Agents"].index(message["Agent1"])
+        index2 = EnvTest.Env["Agents"].index(message["Agent2"])
+        state = EnvFunctions.GetState(EnvTest.Env)
+
+        if state["CarryingFood"][index1] == state["CarryingFood"][index2]:
+            state["AgentLocations"] = [message["Agent1"]["Location"]] * len(EnvTest.Env["Agents"])
+            policy1 = PolicyFunctions.GetPolicy(
+                lookup=EnvTest.Lookups[index1],
+                index=index1,
+                state=state,
+            )
+
+            policy2 = PolicyFunctions.GetPolicy(
+                lookup=EnvTest.Lookups[index2],
+                index=index2,
+                state=state,
+            )
+
+            for index, value in enumerate(policy1["QValues"]):
+                policy1["QValues"][index] = (value + policy2["QValues"][index]) / 2
+                policy2["QValues"][index] = policy1["QValues"][index]
 
 if __name__ == "__main__":
     params: EnvParams = {
@@ -157,10 +197,10 @@ if __name__ == "__main__":
         "ObstacleCount": 10,
         "NestCount": 1,
         "GridSize": {"X": 15, "Y": 15},
-        "Seed": 2,
+        "Seed": 9,
         "MaxSteps": 10_000,
-        "EpisodeCount": 10_000,
-        "ProximityRadius": 1.00,
+        "EpisodeCount": 1000,
+        "ProximityRadius": 0.00,
     }
 
     lookups, episodes = DataStoreFunctions.Load(params)
@@ -182,7 +222,7 @@ if __name__ == "__main__":
         EventFunctions.Connect(env["StepEnded"], EnvTest.OnTrainingStepEnded)
         EventFunctions.Connect(env["EpisodeStarted"], EnvTest.OnEpisodeStarted)
         EventFunctions.Connect(env["EpisodeEnded"], EnvTest.OnEpisodeEnded)
-        EventFunctions.Connect(env["ProximityDetected"], EnvTest.OnProximityDetected)
+        # EventFunctions.Connect(env["ProximityDetected"], EnvTest.OnProximityDetected)
 
         EnvFunctions.RunTrain(env)
 
