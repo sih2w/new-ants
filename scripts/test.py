@@ -94,10 +94,10 @@ class EnvTest:
 
     @staticmethod
     def UpdateAgent(agent: Agent, index: int, action: int):
-        # if index == 1:
-        #     return EnvTest.UpdateAgent1(agent, action)
-        # elif index == 2:
-        #     return EnvTest.UpdateAgent2(agent, action)
+        if index == 1:
+            return EnvTest.UpdateAgent1(agent, action)
+        elif index == 2:
+            return EnvTest.UpdateAgent2(agent, action)
         return EnvTest.UpdateAgent3(agent, action)
 
     @staticmethod
@@ -192,15 +192,15 @@ class EnvTest:
 
 if __name__ == "__main__":
     params: EnvParams = {
-        "AgentCount": 2,
-        "FoodCount": 10,
+        "AgentCount": 3,
+        "FoodCount": 15,
         "ObstacleCount": 10,
         "NestCount": 1,
-        "GridSize": {"X": 15, "Y": 15},
-        "Seed": 9,
+        "GridSize": {"X": 20, "Y": 20},
+        "Seed": 0,
         "MaxSteps": 10_000,
-        "EpisodeCount": 1000,
-        "ProximityRadius": 0.00,
+        "EpisodeCount": 30_000,
+        "ProximityRadius": 0,
     }
 
     lookups, episodes = DataStoreFunctions.Load(params)
@@ -222,7 +222,7 @@ if __name__ == "__main__":
         EventFunctions.Connect(env["StepEnded"], EnvTest.OnTrainingStepEnded)
         EventFunctions.Connect(env["EpisodeStarted"], EnvTest.OnEpisodeStarted)
         EventFunctions.Connect(env["EpisodeEnded"], EnvTest.OnEpisodeEnded)
-        EventFunctions.Connect(env["ProximityDetected"], EnvTest.OnProximityDetected)
+        # EventFunctions.Connect(env["ProximityDetected"], EnvTest.OnProximityDetected)
 
         EnvFunctions.RunTrain(env)
 
