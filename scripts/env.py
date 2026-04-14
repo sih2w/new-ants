@@ -1,9 +1,9 @@
 from math import floor, hypot
-from typing import List, TypedDict, Literal, Callable, TypeVar, Optional, Tuple, Dict
+from typing import List, TypedDict, Literal, TypeVar, Optional, Tuple, Dict
 from pygame import Color, Surface
 from pygame.font import Font
 from numpy.random import Generator, PCG64
-from vector import Vector2
+from scripts.vector import Vector2
 from scripts.event import Event, EventFunctions
 from tqdm import tqdm
 import pygame
@@ -71,6 +71,7 @@ class EnvState(TypedDict):
 class Env(TypedDict):
     Initialized: bool
     Agents: List[Agent]
+    StepCount: int
     Reset: Event
     AllFoodDeposited: Event
     MaxStepReached: Event
@@ -80,6 +81,7 @@ class Env(TypedDict):
     EpisodeStarted: Event
     EpisodeEnded: Event
     ProximityDetected: Event
+    Ticked: Event
     Food: List[Food]
     Obstacles: List[Obstacle]
     Nests: List[Nest]
@@ -170,6 +172,7 @@ class EnvFunctions:
             "ProximityDetected": EventFunctions.Event(),
             "EpisodeStarted": EventFunctions.Event(),
             "EpisodeEnded": EventFunctions.Event(),
+            "Ticked": EventFunctions.Event(),
             "GridSize": params["GridSize"],
             "Running": False,
             "CurrentStep": 0,
@@ -235,10 +238,6 @@ class EnvFunctions:
             env["Window"] = pygame.display.set_mode((env["WindowSize"]["X"], env["WindowSize"]["Y"]))
             env["Font"] = pygame.font.SysFont("arialblack", 30)
 
-            for agent in env["Agents"]:
-                agent["SpawnLocation"] = EnvFunctions.GetEmptyLocation(env)
-                agent["Location"] = agent["SpawnLocation"]
-
             for obstacle in env["Obstacles"]:
                 obstacle["SpawnLocation"] = EnvFunctions.GetEmptyLocation(env)
                 obstacle["Location"] = obstacle["SpawnLocation"]
@@ -250,6 +249,10 @@ class EnvFunctions:
             for food in env["Food"]:
                 food["SpawnLocation"] = EnvFunctions.GetEmptyLocation(env)
                 food["Location"] = food["SpawnLocation"]
+
+            for agent in env["Agents"]:
+                agent["SpawnLocation"] = EnvFunctions.GetEmptyLocation(env)
+                agent["Location"] = agent["SpawnLocation"]
 
     @staticmethod
     def Reset(env: Env):
@@ -398,17 +401,16 @@ class EnvFunctions:
                 surface.blit(image, position)
 
     @staticmethod
-    def DrawArrows(env: Env, callback: Callable[[int, Vector2], int], surface: Surface):
-        for x in range(env["GridSize"]["X"]):
-            for y in range(env["GridSize"]["Y"]):
-                for index, agent in enumerate(env["Agents"]):
-                    location: Vector2 = {"X": x, "Y": y}
-                    action = callback(index, location)
+    def DrawArrows(env: Env, agent_index, grid_actions: List[Tuple[Vector2, int]], surface: Surface):
+        agent = env["Agents"][agent_index]
+        arrow_image = pygame.image.load(ARROW_IMAGE)
+        arrow_image = EnvFunctions.ChangeColor(arrow_image, agent["Color"])
 
-                    image = pygame.image.load(ARROW_IMAGE)
-                    image = EnvFunctions.ChangeColor(image, agent["Color"])
-                    image = pygame.transform.rotate(image, AGENT_ACTIONS[action]["Rotation"])
-                    surface.blit(image, EnvFunctions.GetDrawPosition(location))
+        for grid_action in grid_actions:
+            draw_position = EnvFunctions.GetDrawPosition(grid_action[0])
+            action = grid_action[1]
+            image = pygame.transform.rotate(arrow_image, AGENT_ACTIONS[action]["Rotation"])
+            surface.blit(image, draw_position)
 
     @staticmethod
     def Draw(env: Env, surface: Surface):
@@ -464,26 +466,30 @@ class EnvFunctions:
         }
 
     @staticmethod
-    def CheckProximity(env: Env):
-        detected: Dict[int, List[int]] = {}
-        for index, _ in enumerate(env["Agents"]):
-            detected[index] = []
+    def GetDistanceBetweenAgents(agent_1: Agent, agent_2: Agent) -> int:
+        dx = agent_2["Location"]["X"] - agent_1["Location"]["X"]
+        dy = agent_2["Location"]["Y"] - agent_1["Location"]["Y"]
+        distance = floor(hypot(dx, dy))
+        return distance
 
-        for index1, agent1 in enumerate(env["Agents"]):
-            for index2, agent2 in enumerate(env["Agents"]):
-                if index2 in detected[index1] or index1 in detected[index2]:
+    @staticmethod
+    def CheckProximity(env: Env):
+        detected_agents: Dict[int, List[int]] = {}
+        for index, _ in enumerate(env["Agents"]):
+            detected_agents[index] = []
+
+        for index_1, agent_1 in enumerate(env["Agents"]):
+            for index_2, agent_2 in enumerate(env["Agents"]):
+                if index_1 == index_2 or index_2 in detected_agents[index_1]:
                     continue
 
-                dx = agent2["Location"]["X"] - agent1["Location"]["X"]
-                dy = agent2["Location"]["Y"] - agent1["Location"]["Y"]
-                distance = floor(hypot(dx, dy))
-
+                distance = EnvFunctions.GetDistanceBetweenAgents(agent_1, agent_2)
                 if distance <= env["ProximityRadius"]:
-                    detected[index1].append(index2)
-                    detected[index2].append(index1)
+                    detected_agents[index_1].append(index_2)
+                    detected_agents[index_2].append(index_1)
                     EventFunctions.Fire(env["ProximityDetected"], {
-                        "Agent1": agent1,
-                        "Agent2": agent2,
+                        "Agent1": agent_1,
+                        "Agent2": agent_2,
                     })
 
     @staticmethod
@@ -558,6 +564,7 @@ class EnvFunctions:
     @staticmethod
     def RunTest(env: Env):
         env["Running"] = True
+        env["StepCount"] = 0
         EnvFunctions.Reset(env)
         EnvFunctions.RenderFrame(env)
 
@@ -565,16 +572,20 @@ class EnvFunctions:
             if pygame.key.get_pressed()[pygame.K_SPACE]:
                 if EnvFunctions.AllDeposited(env):
                     EnvFunctions.Reset(env)
+                    env["StepCount"] = 0
 
+                env["StepCount"] += 1
                 EnvFunctions.Step(env)
                 EnvFunctions.RenderFrame(env)
-
-                pygame.time.delay(100)
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     env["Running"] = False
                     EnvFunctions.Close()
+
+            EventFunctions.Fire(env["Ticked"], {
+                "DeltaTime": pygame.time.delay(10),
+            })
 
     @staticmethod
     def Close():

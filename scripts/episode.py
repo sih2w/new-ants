@@ -3,20 +3,28 @@ from matplotlib import pyplot as plt
 
 
 class Episode(TypedDict):
-    AverageRewards: List[float]
+    TotalRewards: int
+    Steps: int
+    Exchanges: int
+    PotentialExchanges: int
+    TerminatedEarly: bool
 
 
 class EpisodeFunctions:
-    TextFontSize = 12
-    NumberFontSize = 10
-    FontName = "Times New Roman"
+    TextFontSize = 20
+    NumberFontSize = 15
+    FontName = "Calibri"
+    Padding = 4
     Step = 100
-    Style = "dark_background"
 
     @staticmethod
     def Episode() -> Episode:
         return {
-            "AverageRewards": []
+            "TotalRewards": 0,
+            "Steps": 0,
+            "Exchanges": 0,
+            "PotentialExchanges": 0,
+            "TerminatedEarly": False,
         }
 
     @staticmethod
@@ -32,31 +40,74 @@ class EpisodeFunctions:
         return averaged_numbers
 
     @staticmethod
-    def PlotRewards(episodes: List[Episode]):
-        y = [sum(episode["AverageRewards"]) for episode in episodes]
-        y = EpisodeFunctions.AverageByInterval(y, EpisodeFunctions.Step)
-        x = [index * EpisodeFunctions.Step for index in range(len(y))]
+    def PlotExchanges(runs: List[List[Episode]]):
+        for run, episodes in enumerate(runs):
+            y = [episode["Exchanges"] for episode in episodes]
+            y = EpisodeFunctions.AverageByInterval(y, EpisodeFunctions.Step)
+            x = [index * EpisodeFunctions.Step for index in range(len(y))]
 
-        plt.style.use(EpisodeFunctions.Style)
-        plt.ylabel("Average Rewards", fontsize=EpisodeFunctions.TextFontSize, fontname=EpisodeFunctions.FontName)
-        plt.yticks(fontsize=EpisodeFunctions.NumberFontSize, fontname=EpisodeFunctions.FontName)
-        plt.title("Rewards per Episode", fontsize=EpisodeFunctions.TextFontSize, fontname=EpisodeFunctions.FontName)
-        plt.xlabel(f"Episode", fontsize=EpisodeFunctions.TextFontSize, fontname=EpisodeFunctions.FontName)
-        plt.xticks(fontsize=EpisodeFunctions.NumberFontSize, fontname=EpisodeFunctions.FontName)
-        plt.plot(x, y)
+            plt.ylabel("Exchanges", fontsize=EpisodeFunctions.TextFontSize, fontname=EpisodeFunctions.FontName)
+            plt.yticks(fontsize=EpisodeFunctions.NumberFontSize, fontname=EpisodeFunctions.FontName)
+            plt.title("Exchanges per Episode", fontsize=EpisodeFunctions.TextFontSize,
+                      fontname=EpisodeFunctions.FontName)
+            plt.xlabel(f"Episode", fontsize=EpisodeFunctions.TextFontSize, fontname=EpisodeFunctions.FontName)
+            plt.xticks(fontsize=EpisodeFunctions.NumberFontSize, fontname=EpisodeFunctions.FontName)
+            plt.tight_layout(pad=EpisodeFunctions.Padding)
+            plt.plot(x, y, label=f"Run {run}")
+
+        plt.legend()
         plt.show()
 
     @staticmethod
-    def PlotSteps(episodes: List[Episode]):
-        y = [len(episode["AverageRewards"]) for episode in episodes]
-        y = EpisodeFunctions.AverageByInterval(y, EpisodeFunctions.Step)
-        x = [index * EpisodeFunctions.Step for index in range(len(y))]
+    def PlotPotentialExchanges(runs: List[List[Episode]]):
+        for run, episodes in enumerate(runs):
+            y = [episode["PotentialExchanges"] for episode in episodes]
+            y = EpisodeFunctions.AverageByInterval(y, EpisodeFunctions.Step)
+            x = [index * EpisodeFunctions.Step for index in range(len(y))]
 
-        plt.style.use(EpisodeFunctions.Style)
-        plt.title("Steps per Episode", fontsize=EpisodeFunctions.TextFontSize, fontname=EpisodeFunctions.FontName)
-        plt.ylabel("Steps", fontsize=EpisodeFunctions.TextFontSize, fontname=EpisodeFunctions.FontName)
-        plt.yticks(fontsize=EpisodeFunctions.NumberFontSize, fontname=EpisodeFunctions.FontName)
-        plt.xlabel(f"Episode", fontsize=EpisodeFunctions.TextFontSize, fontname=EpisodeFunctions.FontName)
-        plt.xticks(fontsize=EpisodeFunctions.NumberFontSize, fontname=EpisodeFunctions.FontName)
-        plt.plot(x, y)
+            plt.ylabel("Potential Exchanges", fontsize=EpisodeFunctions.TextFontSize, fontname=EpisodeFunctions.FontName)
+            plt.yticks(fontsize=EpisodeFunctions.NumberFontSize, fontname=EpisodeFunctions.FontName)
+            plt.title("Potential Exchanges per Episode", fontsize=EpisodeFunctions.TextFontSize, fontname=EpisodeFunctions.FontName)
+            plt.xlabel(f"Episode", fontsize=EpisodeFunctions.TextFontSize, fontname=EpisodeFunctions.FontName)
+            plt.xticks(fontsize=EpisodeFunctions.NumberFontSize, fontname=EpisodeFunctions.FontName)
+            plt.tight_layout(pad=EpisodeFunctions.Padding)
+            plt.plot(x, y, label=f"Run {run}")
+
+        plt.legend()
+        plt.show()
+
+    @staticmethod
+    def PlotRewards(runs: List[List[Episode]]):
+        for run, episodes in enumerate(runs):
+            y = [episode["TotalRewards"] for episode in episodes]
+            y = EpisodeFunctions.AverageByInterval(y, EpisodeFunctions.Step)
+            x = [index * EpisodeFunctions.Step for index in range(len(y))]
+
+            plt.ylabel("Total Rewards", fontsize=EpisodeFunctions.TextFontSize, fontname=EpisodeFunctions.FontName)
+            plt.yticks(fontsize=EpisodeFunctions.NumberFontSize, fontname=EpisodeFunctions.FontName)
+            plt.title("Rewards per Episode", fontsize=EpisodeFunctions.TextFontSize, fontname=EpisodeFunctions.FontName)
+            plt.xlabel(f"Episode", fontsize=EpisodeFunctions.TextFontSize, fontname=EpisodeFunctions.FontName)
+            plt.xticks(fontsize=EpisodeFunctions.NumberFontSize, fontname=EpisodeFunctions.FontName)
+            plt.tight_layout(pad=EpisodeFunctions.Padding)
+            plt.plot(x, y, label=f"Run {run}")
+
+        plt.legend()
+        plt.show()
+
+    @staticmethod
+    def PlotSteps(runs: List[List[Episode]]):
+        for run, episodes in enumerate(runs):
+            y = [episode["Steps"] for episode in episodes]
+            y = EpisodeFunctions.AverageByInterval(y, EpisodeFunctions.Step)
+            x = [index * EpisodeFunctions.Step for index in range(len(y))]
+
+            plt.title("Steps per Episode", fontsize=EpisodeFunctions.TextFontSize, fontname=EpisodeFunctions.FontName)
+            plt.ylabel("Steps", fontsize=EpisodeFunctions.TextFontSize, fontname=EpisodeFunctions.FontName)
+            plt.yticks(fontsize=EpisodeFunctions.NumberFontSize, fontname=EpisodeFunctions.FontName)
+            plt.xlabel(f"Episode", fontsize=EpisodeFunctions.TextFontSize, fontname=EpisodeFunctions.FontName)
+            plt.xticks(fontsize=EpisodeFunctions.NumberFontSize, fontname=EpisodeFunctions.FontName)
+            plt.tight_layout(pad=EpisodeFunctions.Padding)
+            plt.plot(x, y, label=f"Run {run}")
+
+        plt.legend()
         plt.show()

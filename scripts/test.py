@@ -1,247 +1,281 @@
-from typing import List, Any
+from copy import copy
+from typing import Any, Tuple
+import pygame
 from scripts.env import EnvFunctions, Env, EnvParams, Agent, EnvState
-from scripts.datastore import DataStoreFunctions
-from scripts.event import EventFunctions
 from scripts.episode import Episode, EpisodeFunctions
 from scripts.policy import PolicyFunctions, PolicyLookup
 from scripts.vector import Vector2
+from typing import List, TypedDict
 
 
-class EnvTest:
-    Actions: List[int] = []
-    Rewards: List[int] = []
-    Epsilon: float = 1
+class EnvTest(TypedDict):
+    AgentArrowIndex: int
+    Actions: List[int]
+    Rewards: List[int]
+    Epsilon: float
     Lookups: List[PolicyLookup]
     Episodes: List[Episode]
     DecayRate: float
     CurrentEpisode: Episode
+    agent_1FoodIndex: int
+    agent_2FoodIndex : int
+    FoodPriorities: Tuple[Tuple[int]]
     Env: Env
 
+
+class EnvTestFunctions:
     @staticmethod
-    def BeforeDeposited(food_index: int) -> bool:
-        for index, food in enumerate(env["Food"]):
-            if index < food_index and food["Status"] != "Deposited":
-                return False
-        return True
+    def EnvTest(params: EnvParams) -> EnvTest:
+        return {
+            "AgentArrowIndex": 0,
+            "Actions": [],
+            "Rewards": [],
+            "Epsilon": 1,
+            "Lookups": [],
+            "Episodes": [],
+            "DecayRate": 1 / params["EpisodeCount"],
+            "CurrentEpisode": EpisodeFunctions.Episode(),
+            "Agent1FoodIndex": 0,
+            "Agent2FoodIndex": 14,
+            "FoodPriorities": (
+                (0, 1, 2, 3, 4),
+                (5, 6, 7, 8, 9),
+                (10, 11, 12, 13, 14),
+            ),
+            "Env": EnvFunctions.Env(params)
+        }
 
     @staticmethod
-    def AfterDeposited(food_index: int) -> bool:
-        for index, food in enumerate(env["Food"]):
-            if index > food_index and food["Status"] != "Deposited":
-                return False
-        return True
+    def OnMaxStepReached(env: EnvTest):
+        env["CurrentEpisode"]["TerminatedEarly"] = True
+        for food in env["Env"]["Food"]:
+            food["Status"] = "Deposited"
 
     @staticmethod
-    def UpdateAgent1(agent: Agent, action: int):
-        success = EnvFunctions.TryMoveAgent(EnvTest.Env, agent, action)
+    def UpdateAgentOrdered(env: EnvTest, agent: Agent, action: int):
+        success = EnvFunctions.TryMoveAgent(env["Env"], agent, action)
         if not success:
             return -1000
 
-        food = EnvFunctions.OnDroppedFood(EnvTest.Env, agent["Location"])
+        food = EnvFunctions.OnDroppedFood(env["Env"], agent["Location"])
         if food and EnvFunctions.CanPickup(agent, food):
-            # Only pickup if all prior food has been deposited.
-            if EnvTest.BeforeDeposited(EnvTest.Env["Food"].index(food)):
-                EnvFunctions.GiveFood(agent, food)
-                return 10
+            EnvFunctions.GiveFood(agent, food)
 
-        nest = EnvFunctions.OnNest(EnvTest.Env, agent["Location"])
+            food_index = env["Env"]["Food"].index(food)
+            agent_index = env["Env"]["Agents"].index(agent)
+
+            if agent_index == 0:
+                if food_index == env["Agent1FoodIndex"]:
+                    env["Agent1FoodIndex"] += 1
+                    return 100
+            else:
+                if food_index == env["Agent2FoodIndex"]:
+                    env["Agent2FoodIndex"] -= 1
+                    return 100
+            return 10
+
+        nest = EnvFunctions.OnNest(env["Env"], agent["Location"])
         if nest:
             for food in agent["Food"]:
-                if EnvFunctions.CanDeposit(EnvTest.Env, agent, food):
-                    EnvFunctions.Deposit(EnvTest.Env, agent, food)
+                if EnvFunctions.CanDeposit(env["Env"], agent, food):
+                    EnvFunctions.Deposit(env["Env"], agent, food)
                     return 10
         return -1
 
     @staticmethod
-    def UpdateAgent2(agent: Agent, action: int):
-        success = EnvFunctions.TryMoveAgent(EnvTest.Env, agent, action)
+    def UpdateAgentDefault(env: EnvTest, agent: Agent, action: int):
+        success = EnvFunctions.TryMoveAgent(env["Env"], agent, action)
         if not success:
             return -1000
 
-        food = EnvFunctions.OnDroppedFood(EnvTest.Env, agent["Location"])
-        if food and EnvFunctions.CanPickup(agent, food):
-            # Only pickup if all food after has been deposited.
-            if EnvTest.AfterDeposited(EnvTest.Env["Food"].index(food)):
-                EnvFunctions.GiveFood(agent, food)
-                return 10
-
-        nest = EnvFunctions.OnNest(EnvTest.Env, agent["Location"])
-        if nest:
-            for food in agent["Food"]:
-                if EnvFunctions.CanDeposit(EnvTest.Env, agent, food):
-                    EnvFunctions.Deposit(EnvTest.Env, agent, food)
-                    return 10
-        return -1
-
-    @staticmethod
-    def UpdateAgent3(agent: Agent, action: int):
-        success = EnvFunctions.TryMoveAgent(EnvTest.Env, agent, action)
-        if not success:
-            return -1000
-
-        food = EnvFunctions.OnDroppedFood(EnvTest.Env, agent["Location"])
+        food = EnvFunctions.OnDroppedFood(env["Env"], agent["Location"])
         if food and EnvFunctions.CanPickup(agent, food):
             EnvFunctions.GiveFood(agent, food)
             return 10
 
-        nest = EnvFunctions.OnNest(EnvTest.Env, agent["Location"])
+        nest = EnvFunctions.OnNest(env["Env"], agent["Location"])
         if nest:
             for food in agent["Food"]:
-                if EnvFunctions.CanDeposit(EnvTest.Env, agent, food):
-                    EnvFunctions.Deposit(EnvTest.Env, agent, food)
+                if EnvFunctions.CanDeposit(env["Env"], agent, food):
+                    EnvFunctions.Deposit(env["Env"], agent, food)
                     return 10
         return -1
 
     @staticmethod
-    def UpdateAgent(agent: Agent, index: int, action: int):
-        if index == 1:
-            return EnvTest.UpdateAgent1(agent, action)
-        elif index == 2:
-            return EnvTest.UpdateAgent2(agent, action)
-        return EnvTest.UpdateAgent3(agent, action)
+    def UpdateAgentWithPriority(env: EnvTest, agent: Agent, action: int):
+        success = EnvFunctions.TryMoveAgent(env["Env"], agent, action)
+        if not success:
+            return -1000
+
+        food = EnvFunctions.OnDroppedFood(env["Env"], agent["Location"])
+        if food and EnvFunctions.CanPickup(agent, food):
+            agent_index = env["Env"]["Agents"].index(agent)
+            food_index = env["Env"]["Food"].index(food)
+
+            EnvFunctions.GiveFood(agent, food)
+
+            return 100 if food_index in env["FoodPriorities"][agent_index] else 10
+
+        nest = EnvFunctions.OnNest(env["Env"], agent["Location"])
+        if nest:
+            for food in agent["Food"]:
+                if EnvFunctions.CanDeposit(env["Env"], agent, food):
+                    EnvFunctions.Deposit(env["Env"], agent, food)
+                    return 10
+        return -1
 
     @staticmethod
-    def QAction(agent_index: int, state: EnvState):
+    def QAction(env: EnvTest, agent_index: int, state: EnvState):
         return PolicyFunctions.GetAction(
-            lookup=EnvTest.Lookups[agent_index],
+            lookup=env["Lookups"][agent_index],
             agent_index=agent_index,
-            generator=EnvTest.Env["Generator"],
+            generator=env["Env"]["Generator"],
             state=state,
-            epsilon=EnvTest.Epsilon
+            epsilon=env["Epsilon"]
         )
 
     @staticmethod
-    def OnTrainingStepStarted(message: Any):
-        # Clear the last step's actions and rewards.
-        EnvTest.Actions.clear()
-        EnvTest.Rewards.clear()
-
-        # Update each agent using Q-learning.
-        for index, agent in enumerate(EnvTest.Env["Agents"]):
-            EnvTest.Actions.append(EnvTest.QAction(index, message["State"]))
-            EnvTest.Rewards.append(EnvTest.UpdateAgent(agent, index, EnvTest.Actions[index]))
-            agent["LastAction"] = EnvTest.Actions[index]
-
-    @staticmethod
-    def OnTrainingStepEnded(message: Any):
-        total_rewards, count = 0, 1
+    def OnTrainingStepEnded(env: EnvTest, message: Any):
+        total_rewards = 0
         # Update each agent's policy with the chosen action and resulting rewards.
-        for index, agent in enumerate(EnvTest.Env["Agents"]):
-            total_rewards += EnvTest.Rewards[index]
+        for index, agent in enumerate(env["Env"]["Agents"]):
+            total_rewards += env["Rewards"][index]
             PolicyFunctions.UpdatePolicy(
-                lookup=lookups[index],
+                lookup=env["Lookups"][index],
                 agent_index=index,
                 old_state=message["OldState"],
                 new_state=message["NewState"],
-                action=EnvTest.Actions[index],
-                reward=EnvTest.Rewards[index],
+                action=env["Actions"][index],
+                reward=env["Rewards"][index],
             )
 
-        # Add the average reward to the current episode and reduce epsilon.
-        EnvTest.CurrentEpisode["AverageRewards"].append(total_rewards / count)
-        EnvTest.Epsilon -= EnvTest.DecayRate
+        env["CurrentEpisode"]["TotalRewards"] += total_rewards
+        env["CurrentEpisode"]["Steps"] += 1
+        env["Epsilon"] -= env["DecayRate"]
 
     @staticmethod
-    def OnTestingStepStarted(message: Any):
-        EnvTest.Epsilon = 0 # Set to zero to get the most optimal action.
-
-        for index, agent in enumerate(EnvTest.Env["Agents"]):
-            agent["LastAction"] = EnvTest.QAction(index, message["State"])
-            EnvTest.UpdateAgent(agent, index, agent["LastAction"])
-
-    @staticmethod
-    def OnRendered(message: Any):
-        def callback(agent_index: int, location: Vector2):
-            message["State"]["AgentLocations"][agent_index] = location
-            return EnvTest.QAction(agent_index, message["State"])
-        EnvFunctions.DrawArrows(EnvTest.Env, callback, message["Surface"])
+    def OnRendered(env: EnvTest, message: Any):
+        grid_actions = []
+        for x in range(env["Env"]["GridSize"]["X"]):
+            for y in range(env["Env"]["GridSize"]["Y"]):
+                location: Vector2 = {"X": x, "Y": y}
+                message["State"]["AgentLocations"][env["AgentArrowIndex"]] = location
+                action = EnvTestFunctions.QAction(env, env["AgentArrowIndex"], message["State"])
+                grid_actions.append((location, action))
+        EnvFunctions.DrawArrows(env["Env"], env["AgentArrowIndex"], grid_actions, message["Surface"])
 
     @staticmethod
-    def OnEpisodeStarted(message: Any):
-        pass
+    def OnTicked(env: EnvTest, message: Any):
+        current = env["AgentArrowIndex"]
+        if pygame.key.get_pressed()[pygame.K_LEFT]:
+            env["AgentArrowIndex"] -= 1
+        elif pygame.key.get_pressed()[pygame.K_RIGHT]:
+            env["AgentArrowIndex"] += 1
+
+        if current != env["AgentArrowIndex"]:
+            current = min(max(env["AgentArrowIndex"], 0), len(env["Env"]["Agents"]) - 1)
+            env["AgentArrowIndex"] = current
+            EnvFunctions.RenderFrame(env["Env"])
 
     @staticmethod
-    def OnEpisodeEnded(message: Any):
+    def OnEpisodeEnded(env: EnvTest, message: Any):
         # Add the current episode to the episode list and then create a new episode.
-        EnvTest.Episodes.append(EnvTest.CurrentEpisode)
-        EnvTest.CurrentEpisode = EpisodeFunctions.Episode()
+        env["Episodes"].append(env["CurrentEpisode"])
+        env["CurrentEpisode"] = EpisodeFunctions.Episode()
+        env["Agent1FoodIndex"] = 0
+        env["Agent2FoodIndex"] = 14
 
     @staticmethod
-    def OnProximityDetected(message: Any):
-        index1 = EnvTest.Env["Agents"].index(message["Agent1"])
-        index2 = EnvTest.Env["Agents"].index(message["Agent2"])
-        state = EnvFunctions.GetState(EnvTest.Env)
+    def OnReset(env: EnvTest, message: Any):
+        if env["Env"]["StepCount"] > 0:
+            print(env["Env"]["StepCount"])
+            env["Env"]["Running"] = False
 
-        if state["CarryingFood"][index1] == state["CarryingFood"][index2]:
-            state["AgentLocations"] = [message["Agent1"]["Location"]] * len(EnvTest.Env["Agents"])
-            policy1 = PolicyFunctions.GetPolicy(
-                lookup=EnvTest.Lookups[index1],
-                index=index1,
+    @staticmethod
+    def SameStatus(agent_1: Agent, agent_2: Agent):
+        return len(agent_1["Food"]) == len(agent_2["Food"])
+
+    @staticmethod
+    def OnProximityDetectedNoExchange(env: EnvTest, message: Any):
+        agent_1 = message["Agent1"]
+        agent_2 = message["Agent2"]
+
+        if EnvTestFunctions.SameStatus(agent_1, agent_2):
+            env["CurrentEpisode"]["PotentialExchanges"] += 1
+
+    @staticmethod
+    def OnProximityDetectedAverage(env: EnvTest, message: Any):
+        agent_1 = message["Agent1"]
+        agent_2 = message["Agent2"]
+
+        if EnvTestFunctions.SameStatus(agent_1, agent_2):
+            env["CurrentEpisode"]["PotentialExchanges"] += 1
+            env["CurrentEpisode"]["Exchanges"] += 1
+
+            index_1 = env["Env"]["Agents"].index(agent_1)
+            index_2 = env["Env"]["Agents"].index(agent_2)
+            state = EnvFunctions.GetState(env["Env"])
+            
+            policy_grid_1 = PolicyFunctions.GetPolicyGrid(
+                lookup=env["Lookups"][index_1],
+                index=index_1,
                 state=state,
             )
 
-            policy2 = PolicyFunctions.GetPolicy(
-                lookup=EnvTest.Lookups[index2],
-                index=index2,
+            policy_grid_2 = PolicyFunctions.GetPolicyGrid(
+                lookup=env["Lookups"][index_2],
+                index=index_2,
                 state=state,
             )
 
-            for index, value in enumerate(policy1["QValues"]):
-                policy1["QValues"][index] = (value + policy2["QValues"][index]) / 2
-                policy2["QValues"][index] = policy1["QValues"][index]
+            for x in range(env["Env"]["GridSize"]["X"]):
+                for y in range(env["Env"]["GridSize"]["Y"]):
+                    q_values_1 = policy_grid_1[x][y]
+                    q_values_2 = policy_grid_2[x][y]
+                    lists = [q_values_1, q_values_2]
 
-if __name__ == "__main__":
-    params: EnvParams = {
-        "AgentCount": 3,
-        "FoodCount": 15,
-        "ObstacleCount": 10,
-        "NestCount": 1,
-        "GridSize": {"X": 20, "Y": 20},
-        "Seed": 0,
-        "MaxSteps": 10_000,
-        "EpisodeCount": 30_000,
-        "ProximityRadius": 0,
-    }
+                    average_q_values = [sum(q_values) / len(q_values) for q_values in zip(*lists)]
+                    policy_grid_1[x][y] = copy(average_q_values)
+                    policy_grid_2[x][y] = copy(average_q_values)
 
-    lookups, episodes = DataStoreFunctions.Load(params)
-    env: Env = EnvFunctions.Env(params)
+    @staticmethod
+    def OnProximityDetectedFill(env: EnvTest, message: Any):
+        agent_1 = message["Agent1"]
+        agent_2 = message["Agent2"]
 
-    # Config the custom functions.
-    EnvTest.Lookups = lookups
-    EnvTest.Episodes = episodes
-    EnvTest.DecayRate = 1 / params["EpisodeCount"]
-    EnvTest.Env = env
-    EnvTest.CurrentEpisode = EpisodeFunctions.Episode()
+        if EnvTestFunctions.SameStatus(agent_1, agent_2):
+            env["CurrentEpisode"]["PotentialExchanges"] += 1
 
-    # Initialize pygame and the env.
-    EnvFunctions.Init(env)
+            index_1 = env["Env"]["Agents"].index(agent_1)
+            index_2 = env["Env"]["Agents"].index(agent_2)
+            state = EnvFunctions.GetState(env["Env"])
 
-    if len(episodes) == 0:
-        # Connect the training events and start training.
-        EventFunctions.Connect(env["StepStarted"], EnvTest.OnTrainingStepStarted)
-        EventFunctions.Connect(env["StepEnded"], EnvTest.OnTrainingStepEnded)
-        EventFunctions.Connect(env["EpisodeStarted"], EnvTest.OnEpisodeStarted)
-        EventFunctions.Connect(env["EpisodeEnded"], EnvTest.OnEpisodeEnded)
-        # EventFunctions.Connect(env["ProximityDetected"], EnvTest.OnProximityDetected)
+            policy_grid_1 = PolicyFunctions.GetPolicyGrid(
+                lookup=env["Lookups"][index_1],
+                index=index_1,
+                state=state,
+            )
 
-        EnvFunctions.RunTrain(env)
+            policy_grid_2 = PolicyFunctions.GetPolicyGrid(
+                lookup=env["Lookups"][index_2],
+                index=index_2,
+                state=state,
+            )
 
-        # Disconnect the training events.
-        EventFunctions.DisconnectAll(env["StepStarted"])
-        EventFunctions.DisconnectAll(env["StepEnded"])
-        EventFunctions.DisconnectAll(env["EpisodeStarted"])
-        EventFunctions.DisconnectAll(env["EpisodeEnded"])
+            exchanged = False
 
-        # Save the training results.
-        DataStoreFunctions.Save(params, lookups, episodes)
+            for x in range(env["Env"]["GridSize"]["X"]):
+                for y in range(env["Env"]["GridSize"]["Y"]):
+                    q_values_1 = policy_grid_1[x][y]
+                    q_values_2 = policy_grid_2[x][y]
 
-    # Plot the training results.
-    EpisodeFunctions.PlotRewards(episodes)
-    EpisodeFunctions.PlotSteps(episodes)
+                    if all(v == 0 for v in q_values_1) and not all(v == 0 for v in q_values_2):
+                        policy_grid_1[x][y] = copy(q_values_2)
+                        exchanged = True
 
-    # Draw decision arrows on render.
-    # EventFunctions.Connect(env["Rendered"], EnvConfig.OnRendered)
+                    if all(v == 0 for v in q_values_2) and not all(v == 0 for v in q_values_1):
+                        policy_grid_2[x][y] = copy(q_values_1)
+                        exchanged = True
 
-    # Connect the testing events and view result of training.
-    EventFunctions.Connect(env["StepStarted"], EnvTest.OnTestingStepStarted)
-    EnvFunctions.RunTest(env)
+            if exchanged:
+                env["CurrentEpisode"]["Exchanges"] += 1

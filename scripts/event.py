@@ -25,6 +25,6 @@ class EventFunctions:
         event["Callbacks"] = []
 
     @staticmethod
-    def Fire(event: Event, arg: Any):
+    def Fire(event: Event, *args, **kwargs):
         for callback in event["Callbacks"]:
-            callback(arg)
+            callback(*args, **kwargs)
