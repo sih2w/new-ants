@@ -30,8 +30,7 @@ class Experiment5Functions:
 
 
 if __name__ == "__main__":
-    # file_names = [f"Experiment_5_{index}" for index in range(5)]
-    file_names = ["Experiment_5_1", "Experiment_5_3"]
+    file_names = [f"Experiment_5_{index}" for index in range(5)]
 
     params = {
         "AgentCount": 2,
@@ -89,11 +88,8 @@ if __name__ == "__main__":
         env["Epsilon"] = 0 # Set to zero to get the most optimal action.
         # EnvFunctions.RunTest(env["Env"])
 
-        # Disconnect the testing events.
-        EventFunctions.DisconnectAll(env["Env"]["Rendered"])
-        EventFunctions.DisconnectAll(env["Env"]["Reset"])
-        EventFunctions.DisconnectAll(env["Env"]["Ticked"])
-        EventFunctions.DisconnectAll(env["Env"]["StepStarted"])
+    for run, episodes in enumerate(runs):
+        print(f"Run: {run}: {EpisodeFunctions.GetEpisodesToConvergence(episodes)}")
 
     EpisodeFunctions.PlotSteps(runs)
     EpisodeFunctions.PlotRewards(runs)

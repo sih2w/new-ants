@@ -207,15 +207,13 @@ class EnvFunctions:
             "Y": env["Generator"].integers(low=0, high=env["GridSize"]["Y"]),
         }
 
-        if EnvFunctions.IsLocationEmpty(env, location):
-            return location
+        while not EnvFunctions.IsLocationEmpty(env, location):
+            location: Vector2 = {
+                "X": env["Generator"].integers(low=0, high=env["GridSize"]["X"]),
+                "Y": env["Generator"].integers(low=0, high=env["GridSize"]["Y"]),
+            }
 
-        for x in range(env["GridSize"]["X"]):
-            for y in range(env["GridSize"]["Y"]):
-                location: Vector2 = {"X": x, "Y": y}
-                if EnvFunctions.IsLocationEmpty(env, location):
-                    return location
-        return None
+        return location
 
     @staticmethod
     def Init(env: Env):

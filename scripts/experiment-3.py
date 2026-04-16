@@ -90,11 +90,8 @@ if __name__ == "__main__":
         env["Epsilon"] = 0 # Set to zero to get the most optimal action.
         # EnvFunctions.RunTest(env["Env"])
 
-        # Disconnect the testing events.
-        EventFunctions.DisconnectAll(env["Env"]["Rendered"])
-        EventFunctions.DisconnectAll(env["Env"]["Reset"])
-        EventFunctions.DisconnectAll(env["Env"]["Ticked"])
-        EventFunctions.DisconnectAll(env["Env"]["StepStarted"])
+    for run, episodes in enumerate(runs):
+        print(f"Run: {run}: {EpisodeFunctions.GetEpisodesToConvergence(episodes)}")
 
     EpisodeFunctions.PlotSteps(runs)
     EpisodeFunctions.PlotRewards(runs)

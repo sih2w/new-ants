@@ -1,3 +1,4 @@
+from math import floor
 from typing import TypedDict, List
 from matplotlib import pyplot as plt
 
@@ -16,6 +17,17 @@ class EpisodeFunctions:
     FontName = "Calibri"
     Padding = 4
     Step = 100
+
+    @staticmethod
+    def GetEpisodesToConvergence(episodes: List[Episode]) -> int:
+        raw_steps = [episode["Steps"] for episode in episodes]
+        average_steps = EpisodeFunctions.AverageByInterval(raw_steps, EpisodeFunctions.Step)
+        final_steps = floor(average_steps[-1])
+
+        for index in range(len(average_steps) - 1, -1, -1):
+            if floor(average_steps[index]) > final_steps:
+                return index * EpisodeFunctions.Step
+        return 0
 
     @staticmethod
     def Episode() -> Episode:

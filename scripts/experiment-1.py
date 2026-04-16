@@ -88,6 +88,9 @@ if __name__ == "__main__":
         env["Epsilon"] = 0 # Set to zero to get the most optimal action.
         # EnvFunctions.RunTest(env["Env"])
 
+    for run, episodes in enumerate(runs):
+        print(f"Run: {run}: {EpisodeFunctions.GetEpisodesToConvergence(episodes)}")
+
     EpisodeFunctions.PlotSteps(runs)
     EpisodeFunctions.PlotRewards(runs)
     EpisodeFunctions.PlotPotentialExchanges(runs)
